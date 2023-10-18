@@ -17,7 +17,7 @@ endif ()
 
 # OnnxRuntime
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/include)
-link_libraries(${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/lib/libonnxruntime.1.16.1.dylib)
+link_libraries(${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/lib/libonnxruntime.dylib)
 
 # Gflags
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/gflags/include/)
@@ -33,11 +33,19 @@ else ()
     message(FATAL_ERROR "opencv Not Found!")
 endif (OpenCV_FOUND)
 
+# Auto log
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/AutoLog)
+
+# Glog
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glog/include/)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glog/lib/)
+
 # Source
 include_directories(${CMAKE_SOURCE_DIR}/)
 AUX_SOURCE_DIRECTORY(./src SRCS)
 add_executable(PaddleOcrOnnx ${SRCS})
 
 target_link_libraries(PaddleOcrOnnx ${OpenCV_LIBS})
-target_link_libraries(PaddleOcrOnnx ${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/lib/libonnxruntime.1.16.1.dylib)
+target_link_libraries(PaddleOcrOnnx ${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/lib/libonnxruntime.dylib)
 target_link_libraries(PaddleOcrOnnx ${CMAKE_CURRENT_SOURCE_DIR}/third_party/gflags/lib/libgflags.a)
+target_link_libraries(PaddleOcrOnnx ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glog/lib/libglog.a)
