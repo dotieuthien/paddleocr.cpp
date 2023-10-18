@@ -1,5 +1,5 @@
 # paddle.cpp
-
+Just clone PaddleOCR cpp_infer, and using OnnxRuntime instead of Paddle
 
 ### 1. Export the inference model
 Download PaddleOCR models, and directory structure is as follows
