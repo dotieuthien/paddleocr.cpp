@@ -68,65 +68,99 @@ void CRNNRecognizer::Run(std::vector<cv::Mat> img_list,
     auto preprocess_end = std::chrono::steady_clock::now();
     preprocess_diff += preprocess_end - preprocess_start;
 
-    // auto input_names = this->predictor_->GetInputNames();
-    // auto input_t = this->predictor_->GetInputHandle(input_names[0]);
-    // input_t->Reshape({batch_num, 3, imgH, batch_width});
-    // auto inference_start = std::chrono::steady_clock::now();
-    // input_t->CopyFromCpu(input.data());
-    // this->predictor_->Run();
+    std::array<int64_t, 4> input_shape{batch_num, 3, imgH, batch_width};
 
-    // std::vector<float> predict_batch;
-    // auto output_names = this->predictor_->GetOutputNames();
-    // auto output_t = this->predictor_->GetOutputHandle(output_names[0]);
-    // auto predict_shape = output_t->shape();
+    // inference with onnx
+    Ort::AllocatorWithDefaultOptions allocator;
 
-    // int out_num = std::accumulate(predict_shape.begin(), predict_shape.end(), 1,
-    //                               std::multiplies<int>());
-//     predict_batch.resize(out_num);
-//     // predict_batch is the result of Last FC with softmax
-//     output_t->CopyToCpu(predict_batch.data());
-//     auto inference_end = std::chrono::steady_clock::now();
-//     inference_diff += inference_end - inference_start;
-//     // ctc decode
-//     auto postprocess_start = std::chrono::steady_clock::now();
-//     for (int m = 0; m < predict_shape[0]; m++) {
-//       std::string str_res;
-//       int argmax_idx;
-//       int last_index = 0;
-//       float score = 0.f;
-//       int count = 0;
-//       float max_value = 0.0f;
+    // get input names ptr
+    const size_t in_num = session->GetInputCount();
+    std::vector<Ort::AllocatedStringPtr> input_names_ptr;
+    input_names_ptr.reserve(in_num);
+    std::vector<int64_t> input_node_dims;
+    for (size_t i = 0; i < in_num; i++) {
+        auto input_name = session->GetInputNameAllocated(i, allocator);
+        input_names_ptr.push_back(std::move(input_name));
+    }
 
-//       for (int n = 0; n < predict_shape[1]; n++) {
-//         // get idx
-//         argmax_idx = int(Utility::argmax(
-//             &predict_batch[(m * predict_shape[1] + n) * predict_shape[2]],
-//             &predict_batch[(m * predict_shape[1] + n + 1) * predict_shape[2]]));
-//         // get score
-//         max_value = float(*std::max_element(
-//             &predict_batch[(m * predict_shape[1] + n) * predict_shape[2]],
-//             &predict_batch[(m * predict_shape[1] + n + 1) * predict_shape[2]]));
+    // get output name ptr
+    const size_t out_num = session->GetOutputCount();
+    std::vector<Ort::AllocatedStringPtr> output_names_ptr;
+    output_names_ptr.reserve(out_num);
+    std::vector<int64_t> output_node_dims;
+    for (size_t i = 0; i < out_num; i++) {
+        auto output_name = session->GetOutputNameAllocated(i, allocator);
+        output_names_ptr.push_back(std::move(output_name));
+    }
 
-//         if (argmax_idx > 0 && (!(n > 0 && argmax_idx == last_index))) {
-//           score += max_value;
-//           count += 1;
-//           str_res += label_list_[argmax_idx];
-//         }
-//         last_index = argmax_idx;
-//       }
-//       score /= count;
-//       if (std::isnan(score)) {
-//         continue;
-//       }
-//       rec_texts[indices[beg_img_no + m]] = str_res;
-//       rec_text_scores[indices[beg_img_no + m]] = score;
-//     }
-//     auto postprocess_end = std::chrono::steady_clock::now();
-//     postprocess_diff += postprocess_end - postprocess_start;
+    // run
+    auto inference_start = std::chrono::steady_clock::now();
+
+    auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+    std::vector<const char *> input_names = {input_names_ptr.data()->get()};
+    std::vector<const char *> output_names = {output_names_ptr.data()->get()};
+
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input.data(),
+                                                              input.size(), input_shape.data(),
+                                                              input_shape.size());
+
+    auto output_tensor = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
+                                      input_names.size(), output_names.data(), output_names.size());
+    std::vector<int64_t> predict_shape = output_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
+    for (size_t j = 0; j < predict_shape.size(); j++) {
+            printf("Predicted shape dim[%zu] = %llu\n",j, predict_shape[j]);
+    }
+    
+    int64_t output_count = std::accumulate(predict_shape.begin(), predict_shape.end(), 1, 
+                                       std::multiplies<int64_t>());
+
+    // output tensor value                                   
+    float *float_array = output_tensor.front().GetTensorMutableData<float>();
+    std::vector<float> predict_batch(float_array, float_array + output_count);
+
+    auto inference_end = std::chrono::steady_clock::now();
+    inference_diff += inference_end - inference_start;
+
+    // ctc decode
+    auto postprocess_start = std::chrono::steady_clock::now();
+    for (int m = 0; m < predict_shape[0]; m++) {
+      std::string str_res;
+      int argmax_idx;
+      int last_index = 0;
+      float score = 0.f;
+      int count = 0;
+      float max_value = 0.0f;
+
+      for (int n = 0; n < predict_shape[1]; n++) {
+        // get idx
+        argmax_idx = int(Utility::argmax(
+            &predict_batch[(m * predict_shape[1] + n) * predict_shape[2]],
+            &predict_batch[(m * predict_shape[1] + n + 1) * predict_shape[2]]));
+        // get score
+        max_value = float(*std::max_element(
+            &predict_batch[(m * predict_shape[1] + n) * predict_shape[2]],
+            &predict_batch[(m * predict_shape[1] + n + 1) * predict_shape[2]]));
+
+        if (argmax_idx > 0 && (!(n > 0 && argmax_idx == last_index))) {
+          score += max_value;
+          count += 1;
+          str_res += label_list_[argmax_idx];
+        }
+        last_index = argmax_idx;
+      }
+      score /= count;
+      if (std::isnan(score)) {
+        continue;
+      }
+      rec_texts[indices[beg_img_no + m]] = str_res;
+      rec_text_scores[indices[beg_img_no + m]] = score;
+    }
+    auto postprocess_end = std::chrono::steady_clock::now();
+    postprocess_diff += postprocess_end - postprocess_start;
   }
-//   times.push_back(double(preprocess_diff.count() * 1000));
-//   times.push_back(double(inference_diff.count() * 1000));
-//   times.push_back(double(postprocess_diff.count() * 1000));
+  times.push_back(double(preprocess_diff.count() * 1000));
+  times.push_back(double(inference_diff.count() * 1000));
+  times.push_back(double(postprocess_diff.count() * 1000));
 }
 
 void CRNNRecognizer::LoadModel(const std::string &model_dir) {

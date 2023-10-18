@@ -93,19 +93,19 @@ void ocr(std::vector<cv::String> &cv_all_img_names) {
   std::vector<std::vector<OCRPredictResult>> ocr_results =
       ocr.ocr(img_list, FLAGS_det, FLAGS_rec, FLAGS_cls);
 
-  // for (int i = 0; i < img_names.size(); ++i) {
-  //   std::cout << "predict img: " << cv_all_img_names[i] << std::endl;
-  //   Utility::print_result(ocr_results[i]);
-  //   if (FLAGS_visualize && FLAGS_det) {
-  //     std::string file_name = Utility::basename(img_names[i]);
-  //     cv::Mat srcimg = img_list[i];
-  //     Utility::VisualizeBboxes(srcimg, ocr_results[i],
-  //                              FLAGS_output + "/" + file_name);
-  //   }
-  // }
-  // if (FLAGS_benchmark) {
-  //   ocr.benchmark_log(cv_all_img_names.size());
-  // }
+  for (int i = 0; i < img_names.size(); ++i) {
+    std::cout << "predict img: " << cv_all_img_names[i] << std::endl;
+    Utility::print_result(ocr_results[i]);
+    if (FLAGS_visualize && FLAGS_det) {
+      std::string file_name = Utility::basename(img_names[i]);
+      cv::Mat srcimg = img_list[i];
+      Utility::VisualizeBboxes(srcimg, ocr_results[i],
+                               FLAGS_output + "/" + file_name);
+    }
+  }
+  if (FLAGS_benchmark) {
+    ocr.benchmark_log(cv_all_img_names.size());
+  }
 }
 
 // void structure(std::vector<cv::String> &cv_all_img_names) {

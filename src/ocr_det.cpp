@@ -38,67 +38,95 @@ void DBDetector::Run(cv::Mat &img,
   this->permute_op_.Run(&resize_img, input.data());
   auto preprocess_end = std::chrono::steady_clock::now();
 
-//   // Inference.
-//   auto input_names = this->predictor_->GetInputNames();
-//   auto input_t = this->predictor_->GetInputHandle(input_names[0]);
-//   input_t->Reshape({1, 3, resize_img.rows, resize_img.cols});
-//   auto inference_start = std::chrono::steady_clock::now();
-//   input_t->CopyFromCpu(input.data());
+  std::array<int64_t, 4> input_shape{1, 3, resize_img.rows, resize_img.cols};
 
-//   this->predictor_->Run();
+  // inference with onnx
+  Ort::AllocatorWithDefaultOptions allocator;
 
-//   std::vector<float> out_data;
-//   auto output_names = this->predictor_->GetOutputNames();
-//   auto output_t = this->predictor_->GetOutputHandle(output_names[0]);
-//   std::vector<int> output_shape = output_t->shape();
-//   int out_num = std::accumulate(output_shape.begin(), output_shape.end(), 1,
-//                                 std::multiplies<int>());
+  // get input names ptr
+  const size_t in_num = session->GetInputCount();
+  std::vector<Ort::AllocatedStringPtr> input_names_ptr;
+  input_names_ptr.reserve(in_num);
+  std::vector<int64_t> input_node_dims;
+  for (size_t i = 0; i < in_num; i++) {
+      auto input_name = session->GetInputNameAllocated(i, allocator);
+      input_names_ptr.push_back(std::move(input_name));
+  }
 
-//   out_data.resize(out_num);
-//   output_t->CopyToCpu(out_data.data());
-//   auto inference_end = std::chrono::steady_clock::now();
+  // get output name ptr
+  const size_t out_num = session->GetOutputCount();
+  std::vector<Ort::AllocatedStringPtr> output_names_ptr;
+  output_names_ptr.reserve(out_num);
+  std::vector<int64_t> output_node_dims;
+  for (size_t i = 0; i < out_num; i++) {
+      auto output_name = session->GetOutputNameAllocated(i, allocator);
+      output_names_ptr.push_back(std::move(output_name));
+  }
 
-//   auto postprocess_start = std::chrono::steady_clock::now();
-//   int n2 = output_shape[2];
-//   int n3 = output_shape[3];
-//   int n = n2 * n3;
+  // run
+  auto inference_start = std::chrono::steady_clock::now();
 
-//   std::vector<float> pred(n, 0.0);
-//   std::vector<unsigned char> cbuf(n, ' ');
+  auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+  std::vector<const char *> input_names = {input_names_ptr.data()->get()};
+  std::vector<const char *> output_names = {output_names_ptr.data()->get()};
 
-//   for (int i = 0; i < n; i++) {
-//     pred[i] = float(out_data[i]);
-//     cbuf[i] = (unsigned char)((out_data[i]) * 255);
-//   }
+  Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input.data(),
+                                                            input.size(), input_shape.data(),
+                                                            input_shape.size());
 
-//   cv::Mat cbuf_map(n2, n3, CV_8UC1, (unsigned char *)cbuf.data());
-//   cv::Mat pred_map(n2, n3, CV_32F, (float *)pred.data());
+  auto output_tensor = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
+                                    input_names.size(), output_names.data(), output_names.size());
+  std::vector<int64_t> output_shape = output_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
+  int64_t output_count = std::accumulate(output_shape.begin(), output_shape.end(), 1, 
+                                         std::multiplies<int64_t>());
 
-//   const double threshold = this->det_db_thresh_ * 255;
-//   const double maxvalue = 255;
-//   cv::Mat bit_map;
-//   cv::threshold(cbuf_map, bit_map, threshold, maxvalue, cv::THRESH_BINARY);
-//   if (this->use_dilation_) {
-//     cv::Mat dila_ele =
-//         cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
-//     cv::dilate(bit_map, bit_map, dila_ele);
-//   }
+  // output tensor value                                   
+  float *float_array = output_tensor.front().GetTensorMutableData<float>();
+  std::vector<float> out_data(float_array, float_array + output_count);
 
-//   boxes = post_processor_.BoxesFromBitmap(
-//       pred_map, bit_map, this->det_db_box_thresh_, this->det_db_unclip_ratio_,
-//       this->det_db_score_mode_);
+  auto inference_end = std::chrono::steady_clock::now();
 
-//   boxes = post_processor_.FilterTagDetRes(boxes, ratio_h, ratio_w, srcimg);
-//   auto postprocess_end = std::chrono::steady_clock::now();
+  auto postprocess_start = std::chrono::steady_clock::now();
+  int n2 = output_shape[2];
+  int n3 = output_shape[3];
+  int n = n2 * n3;
 
-//   std::chrono::duration<float> preprocess_diff =
-//       preprocess_end - preprocess_start;
-//   times.push_back(double(preprocess_diff.count() * 1000));
-//   std::chrono::duration<float> inference_diff = inference_end - inference_start;
-//   times.push_back(double(inference_diff.count() * 1000));
-//   std::chrono::duration<float> postprocess_diff =
-//       postprocess_end - postprocess_start;
-//   times.push_back(double(postprocess_diff.count() * 1000));
+  std::vector<float> pred(n, 0.0);
+  std::vector<unsigned char> cbuf(n, ' ');
+
+  for (int i = 0; i < n; i++) {
+    pred[i] = float(out_data[i]);
+    cbuf[i] = (unsigned char)((out_data[i]) * 255);
+  }
+
+  cv::Mat cbuf_map(n2, n3, CV_8UC1, (unsigned char *)cbuf.data());
+  cv::Mat pred_map(n2, n3, CV_32F, (float *)pred.data());
+
+  const double threshold = this->det_db_thresh_ * 255;
+  const double maxvalue = 255;
+  cv::Mat bit_map;
+  cv::threshold(cbuf_map, bit_map, threshold, maxvalue, cv::THRESH_BINARY);
+  if (this->use_dilation_) {
+    cv::Mat dila_ele =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+    cv::dilate(bit_map, bit_map, dila_ele);
+  }
+
+  boxes = post_processor_.BoxesFromBitmap(
+      pred_map, bit_map, this->det_db_box_thresh_, this->det_db_unclip_ratio_,
+      this->det_db_score_mode_);
+
+  boxes = post_processor_.FilterTagDetRes(boxes, ratio_h, ratio_w, srcimg);
+  auto postprocess_end = std::chrono::steady_clock::now();
+
+  std::chrono::duration<float> preprocess_diff =
+      preprocess_end - preprocess_start;
+  times.push_back(double(preprocess_diff.count() * 1000));
+  std::chrono::duration<float> inference_diff = inference_end - inference_start;
+  times.push_back(double(inference_diff.count() * 1000));
+  std::chrono::duration<float> postprocess_diff =
+      postprocess_end - postprocess_start;
+  times.push_back(double(postprocess_diff.count() * 1000));
 }
 
 void DBDetector::LoadModel(const std::string &model_dir) {

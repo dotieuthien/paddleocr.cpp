@@ -46,7 +46,7 @@ DEFINE_int32(cls_batch_num, 1, "cls_batch_num.");
 // recognition related
 DEFINE_string(rec_model_dir, "", "Path of rec inference model.");
 DEFINE_int32(rec_batch_num, 6, "rec_batch_num.");
-DEFINE_string(rec_char_dict_path, "../../ppocr/utils/ppocr_keys_v1.txt",
+DEFINE_string(rec_char_dict_path, "ppocr/utils/ppocr_keys_v1.txt",
               "Path of dictionary.");
 DEFINE_int32(rec_img_h, 48, "rec image height");
 DEFINE_int32(rec_img_w, 320, "rec image width");
