@@ -164,6 +164,9 @@ void ocr(std::vector<cv::String> &cv_all_img_names) {
 // }
 
 int main(int argc, char **argv) {
+  std::chrono::duration<float> inference_diff =
+      std::chrono::steady_clock::now() - std::chrono::steady_clock::now();
+  auto inference_start = std::chrono::steady_clock::now();
   // Parsing command-line
   google::ParseCommandLineFlags(&argc, &argv, true);
   check_params();
@@ -189,5 +192,9 @@ int main(int argc, char **argv) {
   // } else {
   //   std::cout << "only value in ['ocr','structure'] is supported" << std::endl;
   // }
+
+  auto inference_end = std::chrono::steady_clock::now();
+  inference_diff = inference_end - inference_start;
+  std::cout << "Total processing time is " << inference_diff.count() << std::endl;
 }
 

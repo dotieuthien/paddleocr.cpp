@@ -100,9 +100,9 @@ void Classifier::Run(std::vector<cv::Mat> img_list,
     auto output_tensor = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
                                       input_names.size(), output_names.data(), output_names.size());
     std::vector<int64_t> predict_shape = output_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
-    for (size_t j = 0; j < predict_shape.size(); j++) {
-            printf("Predicted shape dim[%zu] = %llu\n",j, predict_shape[j]);
-    }
+    // for (size_t j = 0; j < predict_shape.size(); j++) {
+    //         printf("Predicted shape dim[%zu] = %llu\n",j, predict_shape[j]);
+    // }
     
     int64_t output_count = std::accumulate(predict_shape.begin(), predict_shape.end(), 1, 
                                        std::multiplies<int64_t>());
