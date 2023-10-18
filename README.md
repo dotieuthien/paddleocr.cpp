@@ -2,7 +2,7 @@
 
 
 ### 1. Export the inference model
-Origin directory structure is as follows
+Download PaddleOCR models, and directory structure is as follows
 ```
 inference/
 |-- det_db
