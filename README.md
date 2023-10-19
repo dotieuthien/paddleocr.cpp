@@ -46,6 +46,7 @@ inference/
 ```
 
 ### 2. Compile PaddleOCR
+Still in cmake dev to build dependencies as static libs
 
 ### 3. Run the demo
 ##### 1. det+cls+rec：
@@ -76,4 +77,4 @@ inference/
 ### 4. Reference
 [PaddleOCR cpp_infer](https://github.com/PaddlePaddle/PaddleOCR/tree/release/2.7/deploy/cpp_infer): origin implementation of PaddleOCR cpp
 
-[PaddleOCR + OnnxRuntime](https://github.com/RapidAI/RapidOcrOnnx/tree/61d7b434d2b773eb61dab85328240789f69b3ae0): the repo just has no layout function
+[PaddleOCR + OnnxRuntime](https://github.com/RapidAI/RapidOcrOnnx/tree/61d7b434d2b773eb61dab85328240789f69b3ae0): the repo has no layout function
