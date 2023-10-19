@@ -60,3 +60,15 @@ inference/
     --rec=true \
     --cls=true \
 ```
+
+##### 2. layout
+```shell
+./build/PaddleOcrOnnx 
+    --layout_model_dir=inference/layout \
+    --image_dir=images/1.png \
+    --type=structure \
+    --table=false \
+    --layout=true \
+    --det=false \
+    --rec=false
+```

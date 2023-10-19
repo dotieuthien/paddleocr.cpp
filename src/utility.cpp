@@ -364,7 +364,6 @@ Utility::activation_function_softmax(std::vector<float> &src) {
   dst.resize(length);
   const float alpha = float(*std::max_element(&src[0], &src[0 + length]));
   float denominator{0};
-
   for (int i = 0; i < length; ++i) {
     dst[i] = fast_exp(src[i] - alpha);
     denominator += dst[i];

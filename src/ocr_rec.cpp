@@ -77,7 +77,6 @@ void CRNNRecognizer::Run(std::vector<cv::Mat> img_list,
     const size_t in_num = session->GetInputCount();
     std::vector<Ort::AllocatedStringPtr> input_names_ptr;
     input_names_ptr.reserve(in_num);
-    std::vector<int64_t> input_node_dims;
     for (size_t i = 0; i < in_num; i++) {
         auto input_name = session->GetInputNameAllocated(i, allocator);
         input_names_ptr.push_back(std::move(input_name));
@@ -87,7 +86,6 @@ void CRNNRecognizer::Run(std::vector<cv::Mat> img_list,
     const size_t out_num = session->GetOutputCount();
     std::vector<Ort::AllocatedStringPtr> output_names_ptr;
     output_names_ptr.reserve(out_num);
-    std::vector<int64_t> output_node_dims;
     for (size_t i = 0; i < out_num; i++) {
         auto output_name = session->GetOutputNameAllocated(i, allocator);
         output_names_ptr.push_back(std::move(output_name));
@@ -104,15 +102,15 @@ void CRNNRecognizer::Run(std::vector<cv::Mat> img_list,
                                                               input.size(), input_shape.data(),
                                                               input_shape.size());
 
-    auto output_tensor = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
+    auto output_tensors = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
                                       input_names.size(), output_names.data(), output_names.size());
-    std::vector<int64_t> predict_shape = output_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
+    std::vector<int64_t> predict_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
     
     int64_t output_count = std::accumulate(predict_shape.begin(), predict_shape.end(), 1, 
                                        std::multiplies<int64_t>());
 
     // output tensor value                                   
-    float *float_array = output_tensor.front().GetTensorMutableData<float>();
+    float *float_array = output_tensors.front().GetTensorMutableData<float>();
     std::vector<float> predict_batch(float_array, float_array + output_count);
 
     auto inference_end = std::chrono::steady_clock::now();
@@ -168,17 +166,17 @@ void CRNNRecognizer::LoadModel(const std::string &model_dir) {
   const size_t in_num = session->GetInputCount();
   Ort::AllocatorWithDefaultOptions allocator;
   for (int i = 0; i < in_num; ++i) {
-        auto name = session->GetInputNameAllocated(i, allocator);
-        std::cout << "Input Name: " << name.get() << std::endl;
-        
-        auto type_info = session->GetInputTypeInfo(i);
-        auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
-        auto input_node_dims = tensor_info.GetShape();
-        printf("Input num_dims = %zu\n", input_node_dims.size());
-        for (size_t j = 0; j < input_node_dims.size(); j++) {
-            printf("Input dim[%zu] = %llu\n",j, input_node_dims[j]);
-        }
+    auto name = session->GetInputNameAllocated(i, allocator);
+    std::cout << "Input Name: " << name.get() << std::endl;
+    
+    auto type_info = session->GetInputTypeInfo(i);
+    auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
+    auto input_node_dims = tensor_info.GetShape();
+    printf("Input num_dims = %zu\n", input_node_dims.size());
+    for (size_t j = 0; j < input_node_dims.size(); j++) {
+        printf("Input dim[%zu] = %llu\n",j, input_node_dims[j]);
     }
+  }
 }
 
 } // namespace PaddleOCR

@@ -6,7 +6,7 @@
 
 #include <include/args.h>
 #include <include/paddleocr.h>
-// #include <include/paddlestructure.h>
+#include <include/paddlestructure.h>
 #include <include/utility.h>
 
 using namespace PaddleOCR;
@@ -108,60 +108,60 @@ void ocr(std::vector<cv::String> &cv_all_img_names) {
   }
 }
 
-// void structure(std::vector<cv::String> &cv_all_img_names) {
-//   PaddleOCR::PaddleStructure engine = PaddleOCR::PaddleStructure();
+void structure(std::vector<cv::String> &cv_all_img_names) {
+  PaddleOCR::PaddleStructure engine = PaddleOCR::PaddleStructure();
 
-//   if (FLAGS_benchmark) {
-//     engine.reset_timer();
-//   }
+  if (FLAGS_benchmark) {
+    engine.reset_timer();
+  }
 
-//   for (int i = 0; i < cv_all_img_names.size(); i++) {
-//     std::cout << "predict img: " << cv_all_img_names[i] << std::endl;
-//     cv::Mat img = cv::imread(cv_all_img_names[i], cv::IMREAD_COLOR);
-//     if (!img.data) {
-//       std::cerr << "[ERROR] image read failed! image path: "
-//                 << cv_all_img_names[i] << std::endl;
-//       continue;
-//     }
+  for (int i = 0; i < cv_all_img_names.size(); i++) {
+    std::cout << "predict img: " << cv_all_img_names[i] << std::endl;
+    cv::Mat img = cv::imread(cv_all_img_names[i], cv::IMREAD_COLOR);
+    if (!img.data) {
+      std::cerr << "[ERROR] image read failed! image path: "
+                << cv_all_img_names[i] << std::endl;
+      continue;
+    }
 
-//     std::vector<StructurePredictResult> structure_results = engine.structure(
-//         img, FLAGS_layout, FLAGS_table, FLAGS_det && FLAGS_rec);
+    std::vector<StructurePredictResult> structure_results = engine.structure(
+        img, FLAGS_layout, FLAGS_table, FLAGS_det && FLAGS_rec);
 
-//     for (int j = 0; j < structure_results.size(); j++) {
-//       std::cout << j << "\ttype: " << structure_results[j].type
-//                 << ", region: [";
-//       std::cout << structure_results[j].box[0] << ","
-//                 << structure_results[j].box[1] << ","
-//                 << structure_results[j].box[2] << ","
-//                 << structure_results[j].box[3] << "], score: ";
-//       std::cout << structure_results[j].confidence << ", res: ";
+    for (int j = 0; j < structure_results.size(); j++) {
+      std::cout << j << "\ttype: " << structure_results[j].type
+                << ", region: [";
+      std::cout << structure_results[j].box[0] << ","
+                << structure_results[j].box[1] << ","
+                << structure_results[j].box[2] << ","
+                << structure_results[j].box[3] << "], score: ";
+      std::cout << structure_results[j].confidence << ", res: ";
 
-//       if (structure_results[j].type == "table") {
-//         std::cout << structure_results[j].html << std::endl;
-//         if (structure_results[j].cell_box.size() > 0 && FLAGS_visualize) {
-//           std::string file_name = Utility::basename(cv_all_img_names[i]);
+      if (structure_results[j].type == "table") {
+        std::cout << structure_results[j].html << std::endl;
+        if (structure_results[j].cell_box.size() > 0 && FLAGS_visualize) {
+          std::string file_name = Utility::basename(cv_all_img_names[i]);
 
-//           Utility::VisualizeBboxes(img, structure_results[j],
-//                                    FLAGS_output + "/" + std::to_string(j) +
-//                                        "_" + file_name);
-//         }
-//       } else {
-//         std::cout << "count of ocr result is : "
-//                   << structure_results[j].text_res.size() << std::endl;
-//         if (structure_results[j].text_res.size() > 0) {
-//           std::cout << "********** print ocr result "
-//                     << "**********" << std::endl;
-//           Utility::print_result(structure_results[j].text_res);
-//           std::cout << "********** end print ocr result "
-//                     << "**********" << std::endl;
-//         }
-//       }
-//     }
-//   }
-//   if (FLAGS_benchmark) {
-//     engine.benchmark_log(cv_all_img_names.size());
-//   }
-// }
+          Utility::VisualizeBboxes(img, structure_results[j],
+                                   FLAGS_output + "/" + std::to_string(j) +
+                                       "_" + file_name);
+        }
+      } else {
+        std::cout << "count of ocr result is : "
+                  << structure_results[j].text_res.size() << std::endl;
+        if (structure_results[j].text_res.size() > 0) {
+          std::cout << "********** print ocr result "
+                    << "**********" << std::endl;
+          Utility::print_result(structure_results[j].text_res);
+          std::cout << "********** end print ocr result "
+                    << "**********" << std::endl;
+        }
+      }
+    }
+  }
+  if (FLAGS_benchmark) {
+    engine.benchmark_log(cv_all_img_names.size());
+  }
+}
 
 int main(int argc, char **argv) {
   std::chrono::duration<float> inference_diff =
@@ -186,12 +186,11 @@ int main(int argc, char **argv) {
   }
   if (FLAGS_type == "ocr") {
     ocr(cv_all_img_names);
+  } else if (FLAGS_type == "structure") {
+    structure(cv_all_img_names);
+  } else {
+    std::cout << "only value in ['ocr','structure'] is supported" << std::endl;
   }
-  // } else if (FLAGS_type == "structure") {
-  //   structure(cv_all_img_names);
-  // } else {
-  //   std::cout << "only value in ['ocr','structure'] is supported" << std::endl;
-  // }
 
   auto inference_end = std::chrono::steady_clock::now();
   inference_diff = inference_end - inference_start;

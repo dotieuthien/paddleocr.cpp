@@ -54,7 +54,7 @@ DEFINE_int32(rec_img_w, 320, "rec image width");
 // layout model related
 DEFINE_string(layout_model_dir, "", "Path of table layout inference model.");
 DEFINE_string(layout_dict_path,
-              "../../ppocr/utils/dict/layout_dict/layout_publaynet_dict.txt",
+              "ppocr/utils/dict/layout_dict/layout_publaynet_dict.txt",
               "Path of dictionary.");
 DEFINE_double(layout_score_threshold, 0.5, "Threshold of score.");
 DEFINE_double(layout_nms_threshold, 0.5, "Threshold of nms.");
@@ -65,7 +65,7 @@ DEFINE_int32(table_batch_num, 1, "table_batch_num.");
 DEFINE_bool(merge_no_span_structure, true,
             "Whether merge <td> and </td> to <td></td>");
 DEFINE_string(table_char_dict_path,
-              "../../ppocr/utils/dict/table_structure_dict_ch.txt",
+              "ppocr/utils/dict/table_structure_dict_ch.txt",
               "Path of dictionary.");
 
 // ocr forward related
