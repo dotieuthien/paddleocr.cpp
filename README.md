@@ -1,7 +1,7 @@
 Just clone PaddleOCR cpp_infer, and using OnnxRuntime instead of Paddle
 
 ### 1. Export the inference model
-Download PaddleOCR models, and directory structure is as follows
+Download PaddleOCR [ocr models](https://github.com/PaddlePaddle/PaddleOCR/blob/release/2.7/doc/doc_en/models_list_en.md) and [layout models](https://github.com/PaddlePaddle/PaddleOCR/blob/release/2.7/ppstructure/docs/models_list_en.md), and directory structure is as follows
 ```
 inference/
 |-- det_db
