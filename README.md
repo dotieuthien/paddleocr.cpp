@@ -72,6 +72,16 @@ Still in cmake dev to build dependencies as static libs
     --det=false \
     --rec=false
 ```
+##### 3. table
+```shell
+./build/PaddleOcrOnnx 
+    --det_model_dir=inference/det_db \
+    --rec_model_dir=inference/rec_rcnn \
+    --table_model_dir=inference/table \
+    --image_dir=images/table.jpg \
+    --type=structure \
+    --table=true
+```
 
 ### 4. Reference
 [PaddleOCR cpp_infer](https://github.com/PaddlePaddle/PaddleOCR/tree/release/2.7/deploy/cpp_infer): origin implementation of PaddleOCR cpp

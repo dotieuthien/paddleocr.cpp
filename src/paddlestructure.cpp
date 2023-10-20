@@ -116,10 +116,11 @@ void PaddleStructure::table(cv::Mat img,
     }
     // rec
     this->rec(rec_img_list, ocr_result);
+    // TODO: fix segmentation fault
     // rebuild table
-    html = this->rebuild_table(structure_html_tags[i], structure_boxes[i],
-                               ocr_result);
-    structure_result.html = html;
+    // html = this->rebuild_table(structure_html_tags[i], structure_boxes[i],
+    //                            ocr_result);
+    // structure_result.html = html;
     structure_result.cell_box = structure_boxes[i];
     structure_result.html_score = structure_scores[i];
   }

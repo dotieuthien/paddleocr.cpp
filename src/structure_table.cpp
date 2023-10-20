@@ -59,63 +59,105 @@ void StructureTableRecognizer::Run(
     auto preprocess_end = std::chrono::steady_clock::now();
     preprocess_diff += preprocess_end - preprocess_start;
 
-  //   // inference.
-  //   auto input_names = this->predictor_->GetInputNames();
-  //   auto input_t = this->predictor_->GetInputHandle(input_names[0]);
-  //   input_t->Reshape(
-  //       {batch_num, 3, this->table_max_len_, this->table_max_len_});
-  //   auto inference_start = std::chrono::steady_clock::now();
-  //   input_t->CopyFromCpu(input.data());
-  //   this->predictor_->Run();
-  //   auto output_names = this->predictor_->GetOutputNames();
-  //   auto output_tensor0 = this->predictor_->GetOutputHandle(output_names[0]);
-  //   auto output_tensor1 = this->predictor_->GetOutputHandle(output_names[1]);
-  //   std::vector<int> predict_shape0 = output_tensor0->shape();
-  //   std::vector<int> predict_shape1 = output_tensor1->shape();
+    // get shape of norm_img_batch
+    std::array<int64_t, 4> input_shape{batch_num, 3, this->table_max_len_, this->table_max_len_};
 
-  //   int out_num0 = std::accumulate(predict_shape0.begin(), predict_shape0.end(),
-  //                                  1, std::multiplies<int>());
-  //   int out_num1 = std::accumulate(predict_shape1.begin(), predict_shape1.end(),
-  //                                  1, std::multiplies<int>());
-  //   std::vector<float> loc_preds;
-  //   std::vector<float> structure_probs;
-  //   loc_preds.resize(out_num0);
-  //   structure_probs.resize(out_num1);
+    // inference with onnx
+    Ort::AllocatorWithDefaultOptions allocator;
 
-  //   output_tensor0->CopyToCpu(loc_preds.data());
-  //   output_tensor1->CopyToCpu(structure_probs.data());
-  //   auto inference_end = std::chrono::steady_clock::now();
-  //   inference_diff += inference_end - inference_start;
-  //   // postprocess
-  //   auto postprocess_start = std::chrono::steady_clock::now();
-  //   std::vector<std::vector<std::string>> structure_html_tag_batch;
-  //   std::vector<float> structure_score_batch;
-  //   std::vector<std::vector<std::vector<int>>> structure_boxes_batch;
-  //   this->post_processor_.Run(loc_preds, structure_probs, structure_score_batch,
-  //                             predict_shape0, predict_shape1,
-  //                             structure_html_tag_batch, structure_boxes_batch,
-  //                             width_list, height_list);
-  //   for (int m = 0; m < predict_shape0[0]; m++) {
-
-  //     structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
-  //                                        "<table>");
-  //     structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
-  //                                        "<body>");
-  //     structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
-  //                                        "<html>");
-  //     structure_html_tag_batch[m].push_back("</table>");
-  //     structure_html_tag_batch[m].push_back("</body>");
-  //     structure_html_tag_batch[m].push_back("</html>");
-  //     structure_html_tags.push_back(structure_html_tag_batch[m]);
-  //     structure_scores.push_back(structure_score_batch[m]);
-  //     structure_boxes.push_back(structure_boxes_batch[m]);
+    // get input names ptr
+    const size_t in_num = session->GetInputCount();
+    std::vector<Ort::AllocatedStringPtr> input_names_ptr;
+    input_names_ptr.reserve(in_num);
+    for (size_t i = 0; i < in_num; i++) {
+        auto input_name = session->GetInputNameAllocated(i, allocator);
+        input_names_ptr.push_back(std::move(input_name));
     }
-  //   auto postprocess_end = std::chrono::steady_clock::now();
-  //   postprocess_diff += postprocess_end - postprocess_start;
-  //   times.push_back(double(preprocess_diff.count() * 1000));
-  //   times.push_back(double(inference_diff.count() * 1000));
-  //   times.push_back(double(postprocess_diff.count() * 1000));
-  // }
+
+    // get output name ptr
+    const size_t out_num = session->GetOutputCount();
+    std::vector<Ort::AllocatedStringPtr> output_names_ptr;
+    output_names_ptr.reserve(out_num);
+    for (size_t i = 0; i < out_num; i++) {
+        auto output_name = session->GetOutputNameAllocated(i, allocator);
+        output_names_ptr.push_back(std::move(output_name));
+    }
+
+    // run
+    auto inference_start = std::chrono::steady_clock::now();
+
+    auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+    std::vector<const char *> input_names = {input_names_ptr.data()->get()};
+    std::vector<const char *> output_names;
+    for (auto& output_name_ptr : output_names_ptr) {
+      output_names.push_back(output_name_ptr.get());
+    }
+
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input.data(),
+                                                              input.size(), input_shape.data(),
+                                                              input_shape.size());
+
+    auto output_tensors = session->Run(Ort::RunOptions{nullptr}, input_names.data(), &input_tensor,
+                                      input_names.size(), output_names.data(), output_names.size());
+
+    // Get output tensor
+    std::vector<int64_t> predict_shape0_ = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
+    int64_t out_num0 = std::accumulate(predict_shape0_.begin(), predict_shape0_.end(), 1, 
+                                       std::multiplies<int64_t>());                                  
+    float *float_array0 = output_tensors[0].GetTensorMutableData<float>();
+    std::vector<float> loc_preds(float_array0, float_array0 + out_num0);
+
+    std::vector<int64_t> predict_shape1_ = output_tensors[1].GetTensorTypeAndShapeInfo().GetShape();
+    int64_t out_num1 = std::accumulate(predict_shape1_.begin(), predict_shape1_.end(), 1, 
+                                       std::multiplies<int64_t>());                                  
+    float *float_array1 = output_tensors[1].GetTensorMutableData<float>();
+    std::vector<float> structure_probs(float_array1, float_array1 + out_num1);
+
+    auto inference_end = std::chrono::steady_clock::now();
+    inference_diff += inference_end - inference_start;
+
+    std::vector<int> predict_shape0;
+    for (int i = 0; i < predict_shape0_.size(); i++) {
+      predict_shape0.push_back(predict_shape0_[i]);
+    }
+
+    std::vector<int> predict_shape1;
+    for (int i = 0; i < predict_shape1_.size(); i++) {
+      predict_shape1.push_back(predict_shape1_[i]);
+    }
+
+    // postprocess
+    auto postprocess_start = std::chrono::steady_clock::now();
+    std::vector<std::vector<std::string>> structure_html_tag_batch;
+    std::vector<float> structure_score_batch;
+    std::vector<std::vector<std::vector<int>>> structure_boxes_batch;
+    this->post_processor_.Run(loc_preds, structure_probs, structure_score_batch,
+                              predict_shape0, predict_shape1,
+                              structure_html_tag_batch, structure_boxes_batch,
+                              width_list, height_list);
+
+    for (int m = 0; m < predict_shape0[0]; m++) {
+
+      structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
+                                         "<table>");
+      structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
+                                         "<body>");
+      structure_html_tag_batch[m].insert(structure_html_tag_batch[m].begin(),
+                                         "<html>");
+      structure_html_tag_batch[m].push_back("</table>");
+      structure_html_tag_batch[m].push_back("</body>");
+      structure_html_tag_batch[m].push_back("</html>");
+
+      structure_html_tags.push_back(structure_html_tag_batch[m]);
+      structure_scores.push_back(structure_score_batch[m]);
+      structure_boxes.push_back(structure_boxes_batch[m]);
+    }
+    auto postprocess_end = std::chrono::steady_clock::now();
+    postprocess_diff += postprocess_end - postprocess_start;
+    times.push_back(double(preprocess_diff.count() * 1000));
+    times.push_back(double(inference_diff.count() * 1000));
+    times.push_back(double(postprocess_diff.count() * 1000));
+  }
 }
 
 void StructureTableRecognizer::LoadModel(const std::string &model_dir) {

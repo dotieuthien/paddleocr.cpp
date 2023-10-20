@@ -70,7 +70,6 @@ void StructureLayoutRecognizer::Run(cv::Mat img,
 
   auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
   std::vector<const char *> input_names = {input_names_ptr.data()->get()};
-  // std::vector<const char *> output_names = {output_names_ptr.data()->get()};
   std::vector<const char *> output_names;
   for (auto& output_name_ptr : output_names_ptr) {
     output_names.push_back(output_name_ptr.get());
